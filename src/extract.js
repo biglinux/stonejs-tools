@@ -368,12 +368,31 @@ extract.extractHtmlStrings = function(source, functionsNames, pluralFunctionsNam
     var $ = cheerio.load(source);
     var result = {};
 
-    // Extract translatable strings from HTML elements
+    function extractStringsFromData(data, element) {
+        try {
+            var dataObj = new Function("return " + data)();
+            for (var key in dataObj) {
+                if (typeof dataObj[key] === "string" && functionsNames.includes(dataObj[key].slice(0, 1))) {
+                    var str = dataObj[key].slice(2, -2); // Remove _(...)
+                    result[str] = { "": { refs: [$(element).attr("x-data")] }};
+                }
+            }
+        } catch (e) {
+            // Handle error if dataObj is not a valid JavaScript object
+        }
+    }
+
+    $("[x-data]").each(function(index, element) {
+        var xDataContent = $(element).attr("x-data");
+        if (xDataContent) {
+            extractStringsFromData(xDataContent, element);
+        }
+    });
+
     $("[stonejs]").each(function(index, element) {
         result[$(element).html()] = { "": { refs: [0] }};
     });
 
-    // Extract translatable strings from inline JavaScript
     $("script").each(function(index, element) {
         var scriptContent = $(element).html();
         if (scriptContent) {
