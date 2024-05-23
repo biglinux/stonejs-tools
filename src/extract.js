@@ -400,26 +400,20 @@ extract.extractHtmlStrings = function(source, functionsNames, pluralFunctionsNam
         var xDataContent = $(element).attr("x-data");
         if (xDataContent) {
             try {
-                var xDataObject = new Function("return " + xDataContent)();
-                for (var key in xDataObject) {
-                    if (typeof xDataObject[key] === "string" && functionsNames.some(fn => xDataObject[key].includes(fn))) {
-                        var matches = xDataObject[key].match(/_\("([^"]+)"\)/g);
-                        if (matches) {
-                            matches.forEach(match => {
-                                var msgid = match.match(/_\("([^"]+)"\)/)[1];
-                                if (result[msgid] === undefined) {
-                                    result[msgid] = {};
-                                }
-                                if (result[msgid][""] === undefined) {
-                                    result[msgid][""] = { refs: [] };
-                                }
-                                result[msgid][""].refs.push(index + 1); // Use element index as a reference
-                            });
+                var matches = xDataContent.match(/_\("([^"]+)"\)/g);
+                if (matches) {
+                    matches.forEach(match => {
+                        var msgid = match.match(/_\("([^"]+)"\)/)[1];
+                        if (result[msgid] === undefined) {
+                            result[msgid] = {};
                         }
-                    }
+                        if (result[msgid][""] === undefined) {
+                            result[msgid][""] = { refs: [] };
+                        }
+                        result[msgid][""].refs.push(index + 1); // Use element index as a reference
+                    });
                 }
             } catch (e) {
-                // Handle JSON parsing error
                 console.error("Failed to parse x-data content: ", e);
             }
         }
