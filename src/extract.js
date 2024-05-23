@@ -9,45 +9,76 @@ var cheerio = require("cheerio");
 
 var helpers = require("./helpers.js");
 
+/**
+ * @class extract
+ * @constructor
+ */
 var extract = {};
 
+/**
+ * Run all the string extraction process (list files, read files, extract string, generate po template, write po template).
+ *
+ * options:
+ *
+ *     {
+ *         'functions': ["_", "gettext", "lazyGettext"],   // The name of the gettext functions
+ *         'pluralFunctions': ["ngettext", "lazyNgettext"],   // The name of the ngettext functions
+ *         'contextFunctions': ["pgettext", "lazyPgettext"],   // The name of the pgettext functions
+ *         'pluralContextFunctions': ["npgettext", "lazyNpgettext"],   // The name of the npgettext functions
+ *         'quiet': false   // If true: do not output logs
+ *     }
+ *
+ * @method main
+ * @static
+ * @param {Array} jsFiles list of js files to parse (can contain glob pattern)
+ * @param {String} output the output file (.pot)
+ * @param {Object} options additional options (optional, default: see above)
+ * @param {Function} callback function called when everything is done (optional)
+ */
 extract.main = function(jsFiles, output, options, callback) {
     options = options || {};
     if (options.functions === undefined) {
         options.functions = ["_", "gettext", "lazyGettext", "gettext_noop", "N_"];
-    } else if (typeof options.functions == "string") {
+    }
+    else if (typeof options.functions == "string") {
         options.functions = options.functions.split(",");
     }
     if (options.pluralFunctions === undefined) {
         options.pluralFunctions = ["ngettext", "lazyNgettext"];
-    } else if (typeof options.pluralFunctions == "string") {
+    }
+    else if (typeof options.pluralFunctions == "string") {
         options.pluralFunctions = options.pluralFunctions.split(",");
     }
     if (options.contextFunctions === undefined) {
         options.contextFunctions = ["pgettext", "lazyPgettext"];
-    } else if (typeof options.contextFunctions == "string") {
+    }
+    else if (typeof options.contextFunctions == "string") {
         options.contextFunctions = options.contextFunctions.split(",");
     }
     if (options.pluralContextFunctions === undefined) {
         options.pluralContextFunctions = ["npgettext", "lazyNpgettext"];
-    } else if (typeof options.pluralContextFunctions == "string") {
+    }
+    else if (typeof options.pluralContextFunctions == "string") {
         options.pluralContextFunctions = options.pluralContextFunctions.split(",");
     }
-    callback = callback || function() {};
+    callback = callback || function(){};
 
     var files = [];
     var strings = {};
     var skipped = 0;
 
     async.each(jsFiles,
+
         function(jsFile, doneCb) {
-            glob(jsFile, {}, function(error, matchingFiles) {
-                files = files.concat(matchingFiles);
-                doneCb();
-            });
+           glob(jsFile, {}, function(error, matchingFiles) {
+               files = files.concat(matchingFiles);
+               doneCb();
+           });
         },
+
         function() {
             async.each(files,
+
                 function(file, doneCb) {
                     if (!helpers.isFile(file)) {
                         if (!helpers.isDir(file)) {
@@ -58,13 +89,14 @@ extract.main = function(jsFiles, output, options, callback) {
                         return;
                     }
                     helpers.log("  * Extracting strings from '" + file + "'", options);
-                    var data = fs.readFileSync(file, { encoding: "utf-8" });
+                    var data = fs.readFileSync(file, {encoding: "utf-8"});
                     var extractedStrings = {};
                     var ext = file.toLowerCase().split(".");
-                    ext = ext[ext.length - 1];
+                    ext = ext[ext.length-1];
                     if (["html", "htm", "xhtml", "xml", "twig"].indexOf(ext) >= 0) {
                         extractedStrings = extract.extractHtmlStrings(data.toString(), options.functions, options.pluralFunctions, options.contextFunctions, options.pluralContextFunctions);
-                    } else if (["jsx"].indexOf(ext) >= 0) {
+                    }
+                    else if (["jsx"].indexOf(ext) >= 0) {
                         try {
                             extractedStrings = extract.extractJsStrings(data.toString(), options.functions, options.pluralFunctions, options.contextFunctions, options.pluralContextFunctions, true);
                         } catch (error) {
@@ -79,7 +111,8 @@ extract.main = function(jsFiles, output, options, callback) {
                             doneCb();
                             return;
                         }
-                    } else {
+                    }
+                    else {
                         try {
                             extractedStrings = extract.extractJsStrings(data.toString(), options.functions, options.pluralFunctions, options.contextFunctions, options.pluralContextFunctions, false);
                         } catch (error) {
@@ -89,7 +122,7 @@ extract.main = function(jsFiles, output, options, callback) {
                                 ": " + error.toString(),
                                 options
                             );
-                            helpers.warn("File skipped devido a erros de sintaxe", options);
+                            helpers.warn("File skipped due to syntax errors", options);
                             skipped += 1;
                             doneCb();
                             return;
@@ -107,7 +140,7 @@ extract.main = function(jsFiles, output, options, callback) {
                                 strings[str][msgctxt].msgid_plural = extractedStrings[str][msgctxt].msgid_plural;
                             }
                         }
-                        for (var i = 0; i < extractedStrings[str][msgctxt].refs.length; i++) {
+                        for (var i=0 ; i<extractedStrings[str][msgctxt].refs.length ; i++) {
                             strings[str][msgctxt].refs.push({
                                 file: file,
                                 line: extractedStrings[str][msgctxt].refs[i]
@@ -116,15 +149,17 @@ extract.main = function(jsFiles, output, options, callback) {
                     }
                     doneCb();
                 },
+
                 function() {
                     helpers.log(
                         "\n\x1B[1;36m" + Object.keys(strings).length + "\x1B[0m string(s) extracted" +
                         ((skipped > 0) ? ", \x1B[1;31m" + skipped + "\x1B[0m file(s) skipped." : "."),
                         options);
-                    fs.writeFile(output, extract.generatePo(strings), { encoding: "utf-8" }, function(error) {
+                    fs.writeFile(output, extract.generatePo(strings), {encoding: "utf-8"}, function(error) {
                         if (error) {
                             helpers.error("An error occurred: " + error, options);
-                        } else {
+                        }
+                        else {
                             helpers.ok("Translation template written: " + output, options);
                         }
                         callback(error);
@@ -135,6 +170,19 @@ extract.main = function(jsFiles, output, options, callback) {
     );
 };
 
+/**
+ * Extracts strings from the given Javascript source code.
+ *
+ * @method extractJsStrings
+ * @static
+ * @param {String} source The Javascript source code.
+ * @param {string[]} functionsNames The name of the translation functions to search in the source.
+ * @param {string[]} pluralFunctionsNames The name of the translation functions with plural support.
+ * @param {string[]} contextFunctionsNames The name of the translation functions with context support.
+ * @param {string[]} pluralContextFunctionsNames The name of the translation functions with plural and context support.
+ * @param {boolean} [isJsx] whether source file is jsx
+ * @return {Object} Translatable strings `{ <string>: { <context>: { msgid_plural: <plural>, refs: [<lines>] } } }`.
+ */
 extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames, contextFunctionsNames, pluralContextFunctionsNames, isJsx) {
     isJsx = isJsx || false;
     var strings = {};
@@ -150,7 +198,7 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
     });
 
     function _cleanString(str) {
-        return new Function("return " + str + ";")();
+        return new Function("return " + str + ";")();  // jshint ignore:line
     }
 
     var f_fn = false;         // In function flag
@@ -189,8 +237,9 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
         msgid_plural = undefined;
         msgctxt = "";
     }
-    for (var i = 0; i < ast.tokens.length; i++) {
+    for (var i=0 ; i<ast.tokens.length ; i++) {
 
+        // ?
         if (!f_fn && !f_sp) {
             if (ast.tokens[i].type == "Identifier") {
                 if (functionsNames.indexOf(ast.tokens[i].value) > -1) {
@@ -211,33 +260,47 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
                     f_findMsgid = false;
                 }
             }
-        } else if (f_fn && !f_sp) {
+        }
+
+        // functionName
+        else if (f_fn && !f_sp) {
             if (ast.tokens[i].type == "Punctuator" && ast.tokens[i].value == "(") {
                 f_sp = true;
                 msgBuff = "";
-            } else {
+            }
+            else {
                 stop();
             }
-        } else if (f_fn && f_sp) {
+        }
+
+        // functionName (
+        else if (f_fn && f_sp) {
             if (ast.tokens[i].type == "String" || ast.tokens[i].type == "Numeric") {
                 msgBuff += _cleanString(ast.tokens[i].value);
-            } else if (ast.tokens[i].type == "Punctuator" && ast.tokens[i].value == "+") {
+            }
+            else if (ast.tokens[i].type == "Punctuator" && ast.tokens[i].value == "+") {
                 continue;
-            } else if (ast.tokens[i].type == "Identifier") {
+            }
+            else if (ast.tokens[i].type == "Identifier") {
                 msgBuff = "";
                 stop();
-            } else {
+            }
+            else {
                 if (f_isContext) {
                     if (f_isPlural) {
+                        // npgettext
                         if (f_findPlural) {
+                            // third parameter: msgid_plural
                             msgid_plural = msgBuff;
                             pushString();
                             stop();
                         } else if (f_findMsgid) {
+                            // second parameter: msgid
                             msgid = msgBuff;
                             msgBuff = "";
                             f_findPlural = true;
                         } else {
+                            // first parameter: context
                             msgctxt = msgBuff;
                             line = ast.tokens[i].loc.start.line;
                             msgBuff = "";
@@ -245,11 +308,14 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
                         }
 
                     } else {
+                        // pgettext
                         if (f_findMsgid) {
+                            // second parameter: msgid
                             msgid = msgBuff;
                             pushString();
                             stop();
                         } else {
+                            // first parameter: context
                             msgctxt = msgBuff;
                             line = ast.tokens[i].loc.start.line;
                             msgBuff = "";
@@ -258,11 +324,14 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
                     }
 
                 } else if (f_isPlural) {
+                    // ngettext
                     if (f_findPlural) {
+                        // second paramter: msgid_plural
                         msgid_plural = msgBuff;
                         pushString();
                         stop();
                     } else {
+                        // first parameter: msgid
                         msgid = msgBuff;
                         line = ast.tokens[i].loc.start.line;
                         msgBuff = "";
@@ -270,6 +339,7 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
                     }
 
                 } else {
+                    // gettext
                     msgid = msgBuff;
                     line = ast.tokens[i].loc.start.line;
                     pushString();
@@ -282,35 +352,28 @@ extract.extractJsStrings = function(source, functionsNames, pluralFunctionsNames
     return strings;
 };
 
+/**
+ * Extracts strings from the given HTML.
+ *
+ * @method extractHtmlStrings
+ * @static
+ * @param {String} source The HTML source code.
+ * @param {string[]} functionsNames The name of the translation functions to search in the source.
+ * @param {string[]} pluralFunctionsNames The name of the translation functions with plural support.
+ * @param {string[]} contextFunctionsNames The name of the translation functions with context support.
+ * @param {string[]} pluralContextFunctionsNames The name of the translation functions with plural and context support.
+ * @return {Object} Translatable strings `{ <string>: { "": { [<lines>] } } }`.
+ */
 extract.extractHtmlStrings = function(source, functionsNames, pluralFunctionsNames, contextFunctionsNames, pluralContextFunctionsNames) {
     var $ = cheerio.load(source);
     var result = {};
 
-    function extractStringsFromData(data, element) {
-        try {
-            var dataObj = new Function("return " + data)();
-            for (var key in dataObj) {
-                if (typeof dataObj[key] === "string" && functionsNames.includes(dataObj[key].slice(0, 1))) {
-                    var str = dataObj[key].slice(2, -2); // Remove _(...)
-                    result[str] = { "": { refs: [$(element).attr("x-data")] }};
-                }
-            }
-        } catch (e) {
-            // Handle error if dataObj is not a valid JavaScript object
-        }
-    }
-
-    $("[x-data]").each(function(index, element) {
-        var xDataContent = $(element).attr("x-data");
-        if (xDataContent) {
-            extractStringsFromData(xDataContent, element);
-        }
-    });
-
+    // Extract translatable strings from HTML elements
     $("[stonejs]").each(function(index, element) {
         result[$(element).html()] = { "": { refs: [0] }};
     });
 
+    // Extract translatable strings from inline JavaScript
     $("script").each(function(index, element) {
         var scriptContent = $(element).html();
         if (scriptContent) {
@@ -332,14 +395,52 @@ extract.extractHtmlStrings = function(source, functionsNames, pluralFunctionsNam
         }
     });
 
+    // Extract translatable strings from Alpine.js x-data attribute
+    $("[x-data]").each(function(index, element) {
+        var xDataContent = $(element).attr("x-data");
+        if (xDataContent) {
+            try {
+                var xDataObject = new Function("return " + xDataContent)();
+                for (var key in xDataObject) {
+                    if (typeof xDataObject[key] === "string" && functionsNames.some(fn => xDataObject[key].includes(fn))) {
+                        var matches = xDataObject[key].match(/_\("([^"]+)"\)/g);
+                        if (matches) {
+                            matches.forEach(match => {
+                                var msgid = match.match(/_\("([^"]+)"\)/)[1];
+                                if (result[msgid] === undefined) {
+                                    result[msgid] = {};
+                                }
+                                if (result[msgid][""] === undefined) {
+                                    result[msgid][""] = { refs: [] };
+                                }
+                                result[msgid][""].refs.push(index + 1); // Use element index as a reference
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                // Handle JSON parsing error
+                console.error("Failed to parse x-data content: ", e);
+            }
+        }
+    });
+
     return result;
 };
 
+/**
+ * Generates the .po file.
+ *
+ * @method generatePo
+ * @static
+ * @param {Object} strings the strings `{ "<msgid>": { "msgctxt": { msgid_plural: "msgid_plural", refs: [{file: String, line: Number}] } } }`.
+ * @return {String} the generated po file.
+ */
 extract.generatePo = function(strings) {
 
     function _buildRef(refs) {
         var result = "";
-        for (var i = 0; i < refs.length; i++) {
+        for (var i=0 ; i<refs.length ; i++) {
             if (i > 0) result += "\n";
             result += refs[i].file + ":" + refs[i].line;
         }
@@ -349,6 +450,7 @@ extract.generatePo = function(strings) {
     var date = new Date();
     var data = {
         "charset": "utf-8",
+
         headers: {
             "mime-version": "1.0",
             "content-type": "text/plain; charset=utf-8",
@@ -358,8 +460,19 @@ extract.generatePo = function(strings) {
             "language": "C",
             "plural-forms": "nplurals=2; plural=(n != 1);"
         },
+
         translations: {
-            "": {}
+            "": {
+                // "<msgid>" {
+                //     msgctxt: "<msgctxt>",
+                //     msgid: "<msgid>",
+                //     msgid_plural: "<msgid_plural>",
+                //     msgstr: ["<msgstr>"],
+                //     comments: {
+                //         reference: "<ref1>\n<ref2>"
+                //     }
+                // }
+            }
         }
     };
 
